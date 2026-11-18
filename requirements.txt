@@ -1,0 +1,5 @@
+yt-dlp>=2024.1.1
+pysrt>=1.1.2
+python-dotenv>=1.0.0
+# Optional: automatic captions (needs FFmpeg on PATH; heavy — run on a real PC)
+# faster-whisper>=1.0.0

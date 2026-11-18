@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+gta6-clips/
+youtube-clips/
+*.mp4
+*.mkv
+*.webm
+*_chat.json
+*_chat.json.gz
+*_spikes.json
+.DS_Store
