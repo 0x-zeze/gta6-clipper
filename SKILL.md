@@ -199,13 +199,56 @@ python3 scripts/generate_summary.py --moment moments.json --index 0 \
 
 **Goal**: post to YouTube Shorts and keep a record.
 
-1. Upload via YouTube Studio (manual) or YouTube Data API.
-   No auto-upload is wired in yet — upload is a manual step for now.
+1. Upload with the `youtube-upload` supporting skill (YouTube Data API v3,
+   CLI `yt-upload`, installed at `~/workspace/yt-upload-venv/`):
+   dry-run the metadata plan first, show it to the user, then
+   `--execute` only after their go-ahead for that video. Uploads land
+   **private** — the user publishes in YouTube Studio. If the one-time
+   Google Cloud OAuth setup has not been done (`yt-upload status` says
+   `needs_auth`), fall back to manual upload in YouTube Studio and tell
+   the user the setup is still pending.
 2. If in a paid campaign: submit the Shorts link within the brief's
    deadline (usually ≤30 min after posting) on Content Rewards.
 3. Record the clip: streamer, VOD id, clip start/duration, Shorts URL,
    views after 24h. Keep it in the repo's `clips/` log (or tell the user).
 4. Ask whether to cut more moments from the same VOD (back to Stage 4).
+
+---
+
+## Supporting skills (installed 2026-11-19, ~/workspace/custom-skills/)
+
+These sit next to this skill and sharpen specific stages. They do NOT
+replace this pipeline — use the named part only.
+
+- **viral-hooks** (`rediumvex/viral-hooks-skill`, MIT) — 100 hook formulas
+  across 10 psychology triggers. Stage 5.4: after the moment is picked,
+  pull 3 hook variants from `hooks-database.md` and use the best one for
+  the Shorts title + first line of the description. The video hook stays
+  the first spoken words (reference format) — this skill writes the
+  *packaging* text, it does not change the video.
+- **video-to-shorts** (`social-media-skills/video-to-shorts-skill`, MIT) —
+  clip rubric (`references/clip-rubric.md`): hard gates + 100-point score
+  (hook in first 3s 25, stands alone 20, payoff 20, energy 15,
+  specifics 10, last line 10). Stage 4: score spike candidates from the
+  transcript and ship 70+, review 55–69, drop the rest. Also
+  `references/shorts-specs.md`: caption safe areas, audio -14 LUFS,
+  remove pauses over 0.45s. Do NOT swap in its render/post scripts —
+  this skill's FFmpeg ref format and permission rules stay. Posting via
+  WoopSocial needs a WoopSocial account.
+- **tiktok-video-skills** (`iart-ai/tiktok-video-skills`, MIT) —
+  `skills/short-form-video/SKILL.md`: retention grammar (hook → setup →
+  body → payoff/loop), one pattern interrupt every 2–4s (cheapest:
+  punch-in zoom 1.0→1.12 on the beat), 9:16 safe area (center 900×1400,
+  bottom 320px clear, top 120px, right 120px), loop techniques.
+  `skills/caption-animation/SKILL.md`: word-by-word timing + karaoke
+  highlight. Its delivery is Remotion-based — take the grammar, not the
+  renderer; this pipeline stays FFmpeg.
+- **youtube-upload** (`grapeot/youtube-upload-skill`, MIT) — Stage 6:
+  official YouTube Data API v3 upload, private by default, dry-run
+  first, never publishes/schedules/deletes. CLI `yt-upload` (venv
+  `~/workspace/yt-upload-venv/`). Needs one-time setup by the user:
+  Google Cloud project + Desktop OAuth client + `yt-upload auth`.
+  Quota ~550 units per upload with thumbnail + caption track.
 
 ---
 

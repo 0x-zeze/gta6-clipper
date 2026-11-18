@@ -100,7 +100,10 @@ dan kenapa kecepatan posting di launch week menentukan siapa yang menang.
                           .ass harus dari file segmen yang sama — lihat
                           "Format referensi" di atas)
 8. Copy Shorts          -> python3 scripts/generate_summary.py --streamer Lacy
-9. Upload ke Shorts     -> YouTube Studio / YouTube Data API (manual dulu)
+9. Upload ke Shorts     -> youtube-upload skill (yt-upload CLI, Data API v3,
+                          private dulu, dry-run + approval per video;
+                          butuh setup OAuth sekali oleh kamu) atau manual
+                          via YouTube Studio kalau belum di-setup
 ```
 
 ### Rute B — LIVE (saat stream masih jalan, paling cepat)
@@ -141,6 +144,31 @@ npx skills add https://github.com/0x-zeze/gta6-clipper
 
 atau salin folder ini ke `~/.claude/skills/gta6-clipper/`. Lalu tinggal
 bilang ke agen: "Clip momen GTA 6 dari VOD ini".
+
+## Skill pendukung (diinstal 19 Nov 2026)
+
+Empat skill dari GitHub (semua MIT) yang menunjang pipeline ini — ada di
+`~/workspace/custom-skills/`:
+
+- **viral-hooks** (rediumvex/viral-hooks-skill, 137★) — 100 formula hook
+  dari 10 trigger psikologi. Dipakai untuk judul + baris pertama deskripsi
+  Shorts. Hook video tetap kata pertama yang diucapkan (format referensi);
+  skill ini menulis teks kemasannya.
+- **video-to-shorts** (social-media-skills, MIT) — rubrik skor klip
+  100 poin + hard gates untuk menilai kandidat momen dari chat-spike
+  (kirim yang skor ≥70), plus spek safe area caption dan audio -14 LUFS.
+  Script render/posting-nya TIDAK dipakai — pipeline tetap FFmpeg format
+  referensi di sini.
+- **tiktok-video-skills** (iart-ai, MIT) — grammar retensi short-form:
+  pattern interrupt tiap 2–4 detik (paling murah: punch-in zoom),
+  safe area 9:16 (pusat 900×1400, bawah 320px kosong), teknik loop,
+  caption-animation kata-per-kata. Delivery-nya Remotion — diambil
+  grammar-nya, bukan renderer-nya.
+- **youtube-upload** (grapeot, MIT) — auto-upload via YouTube Data API v3
+  resmi. Private by default, dry-run dulu, tidak pernah publish.
+  CLI `yt-upload` sudah terinstal di `~/workspace/yt-upload-venv/`
+  (tes offline repo: 217 passed). Butuh setup satu kali oleh kamu:
+  Google Cloud project + OAuth Desktop client + `yt-upload auth`.
 
 ## ⚠️ HARDWARE — baca dulu
 
