@@ -1,13 +1,15 @@
 ---
 name: gta6-clipper
 description: >
-  GTA VI stream clipper: turn long Twitch streams into 15-60s vertical
-  YouTube Shorts. Detect viral moments from Twitch chat velocity spikes,
-  cut 9:16 vertical clips with FFmpeg, caption with faster-whisper,
-  translate captions EN->ID, and prepare Shorts copy. Use when the user
-  wants to clip a GTA VI streamer, find highlights in a Twitch VOD, or
-  make Shorts from stream footage. Keywords: gta 6, gta vi, clipper,
-  twitch, chat spike, vertical video, youtube shorts, 9:16, caption.
+  GTA VI stream clipper: turn long Twitch streams into 25-35s vertical
+  YouTube Shorts in the verified reference format (facecam-top, orange
+  border, big word-by-word captions). Detect viral moments from Twitch
+  chat velocity spikes, cut 9:16 vertical clips with FFmpeg, caption with
+  faster-whisper (.ass), translate captions EN->ID, and prepare Shorts
+  copy. Use when the user wants to clip a GTA VI streamer, find highlights
+  in a Twitch VOD, or make Shorts from stream footage. Keywords: gta 6,
+  gta vi, clipper, twitch, chat spike, vertical video, youtube shorts,
+  9:16, caption.
 allowed-tools:
   - Read
   - Write
@@ -95,7 +97,12 @@ misses pure gameplay reactions. Prefer chat spikes for GTA VI.
 1. Show the ranked candidate list: clip start (HMS), duration,
    peak msgs/10s, spike factor.
 2. Ask the user (AskUserQuestion, multi-select) which candidates to cut
-   + layout per clip (`gameplay` or `facecam-top`/`facecam-bottom`).
+   + layout per clip. **Default layout is `ref`** (reference format:
+   facecam-top + orange border + big word-by-word captions, 25-35s);
+   legacy layouts `gameplay` / `facecam-top` / `facecam-bottom` still
+   exist. `ref` needs the streamer's facecam region in source pixels
+   (find it once per streamer, e.g. Kai Cenat 15:520:255:198 in a
+   1280x720 source — x:y:w:h).
 3. Confirm the plan before cutting. Do not cut all spikes blindly —
    3-10 best moments per VOD is the sweet spot for launch week.
 
@@ -105,43 +112,69 @@ misses pure gameplay reactions. Prefer chat spikes for GTA VI.
 
 For each chosen candidate:
 
-### 5.1 Vertical cut
+### 5.1 Vertical cut (reference format = default)
 
 ```bash
+# Reference format: facecam-top + orange border + .ass captions.
+# --start must match the segment the .ass was transcribed from (usually 0).
+python3 scripts/vertical_cut.py --input clip.mp4 --start 0 \
+    --duration 30 --style ref --facecam 15:520:255:198 --ass clip.ass \
+    --output clip_01.mp4
+# Legacy layouts (still work):
 python3 scripts/vertical_cut.py --input vod.mp4 --start <clip_start> \
     --duration 30 --layout gameplay --output clip_01.mp4
-# facecam layout needs the webcam region in source pixels:
 python3 scripts/vertical_cut.py --input vod.mp4 --start <clip_start> \
     --duration 30 --layout facecam-top --facecam 1620:20:280:160 \
     --output clip_01.mp4
 ```
 
-- Layouts: `gameplay` (center-crop), `facecam-top` (cam top 45%),
-  `facecam-bottom`. Output: 1080x1920, 30 fps, H.264 + AAC.
+- Default target: **25-35s** per clip; the hook is the first spoken
+  words (no static title text on top). `--style ref` implies
+  `--layout facecam-top` and needs `--facecam x:y:w:h` + `--ass`.
+- Output: 1080x1920, 30 fps, H.264 + AAC.
 - `--dry-run` prints the FFmpeg command without rendering.
+- **Timestamp rule:** the .ass must be transcribed from the SAME segment
+  file passed to `vertical_cut.py`, with the same `--start`. A .ass made
+  from the full VOD has VOD-relative timestamps that do not match the
+  `-ss` seek — the captions would not show at all.
 
-### 5.2 Captions
+### 5.2 Captions (word-by-word .ass = default)
 
 ```bash
-# Option A — faster-whisper (needs: pip install faster-whisper)
-python3 scripts/caption_whisper.py --input clip_01.mp4 --output clip_01.srt \
-    --model tiny --language en --word-level
-# Option B — YouTube auto-subtitles + translate
+# Option A — faster-whisper (needs: pip install faster-whisper;
+# on this VM use the venv that already has it)
+~/workspace/whisper-venv/bin/python scripts/caption_whisper.py \
+    --input clip.mp4 --output clip.ass --model tiny --language en
+# Option B — YouTube auto-subtitles + translate (no .ass word timings)
 python3 scripts/translate_subtitles.py --prepare clip_01_en.srt
 # ... agent translates batches EN->ID ...
 python3 scripts/translate_subtitles.py --apply clip_01_en.srt \
     --translations translated.json --output clip_01_id.srt
 ```
 
+- **Default output is .ass, one word per event, ALL-CAPS** (reference
+  format: DejaVu Sans 110, white bold, black outline, Alignment 8,
+  MarginV 890, min word duration 0.12s). `.srt` output is still
+  available (`--output clip.srt`, `--word-level` for word groups).
+- **Never burn big captions via the subtitles filter + .srt**: SRT is
+  converted to ASS with a default PlayRes of 384x288, so FontSize gets
+  scaled ~6.7x and the letters come out gigantic (proven by a failed
+  first render). Always use a real .ass file (PlayRes 1080x1920) with
+  the `ass` filter — that is what `--style ref` does.
+- PyAV 19 note: `caption_whisper.py` monkey-patches `av.open` to drop
+  the `metadata_errors` kwarg faster-whisper passes (PyAV 19 rejects
+  it). If faster-whisper is missing, the script prints install
+  instructions and exits 2 — do NOT pretend it worked. Document it
+  and use Option B.
 - Caption rules: colloquial Indonesian, short lines, keep game terms in
   English (kill, clutch, NPC, Wasted, drive-by).
-- If faster-whisper is missing, the script prints install instructions
-  and exits 2 — do NOT pretend it worked. Document it and use Option B.
 
 ### 5.3 Burn captions + bilingual file (optional)
 
 ```bash
-# Burn ID subtitles into the vertical clip:
+# Reference format burns the .ass in the SAME vertical_cut call
+# (see 5.1) — no separate burn step needed.
+# Legacy layouts only: burn ID subtitles into the vertical clip:
 python3 scripts/vertical_cut.py --input vod.mp4 --start <clip_start> \
     --duration 30 --layout gameplay --srt clip_01_id.srt --output clip_01_cap.mp4
 # Or burn with the original helper (needs FFmpeg with libass):
@@ -177,6 +210,20 @@ python3 scripts/generate_summary.py --moment moments.json --index 0 \
 ---
 
 ## Key technical notes
+
+### Reference format (default) — verified numbers, do not change
+From Typical Gamer's Shorts "The Biggest Problem with GTA 6…" (28s),
+reproduced on a Kai Cenat clip (kai-ref2.mp4, 1080x1920):
+- Facecam panel top 45% (1080x864), gameplay bottom 55% (1080x1056).
+- Orange border: `drawbox x=0 y=0 w=1080 h=864 color 0xFF6B00 thickness 8`.
+- Captions: 1 word per event, ALL-CAPS, DejaVu Sans 110, white bold,
+  black outline, BorderStyle 1, Outline 3, Alignment 8, MarginV 890,
+  min word duration 0.12s, PlayRes 1080x1920.
+- Duration 25-35s; hook = first spoken words.
+- **TODO (not this round):** rounded corners + glow on the facecam
+  panel (the original has them; `drawbox` is square).
+- Facecam crop is per-streamer (Kai Cenat 1280x720 source:
+  `15:520:255:198` as x:y:w:h). Find it once per streamer and reuse.
 
 ### Chat reacts late — always pre-roll 20s
 The spike marks when chat *reacted*. The moment happened ~20s earlier.

@@ -14,6 +14,60 @@ subtitle EN→ID, dan workflow khusus clipper GTA VI.
 
 ---
 
+## Format referensi (default) — Typical Gamer Shorts
+
+Format yang dipakai semua klip sekarang, diverifikasi dari Shorts
+Typical Gamer "The Biggest Problem with GTA 6…" (28 detik) dan
+direproduksi di sini pada klip Kai Cenat (`kai-ref2.mp4`, 1080x1920):
+
+- **Layout facecam-top**: facecam streamer di panel atas 45%
+  (1080x864), gameplay di bawah 55% (1080x1056). Output 1080x1920 30fps.
+- **Border oranye** di sekeliling panel facecam:
+  `drawbox x=0 y=0 w=1080 h=864 color 0xFF6B00 thickness 8`.
+  (Sudut membulat + glow di referensi asli = TODO, belum ronde ini.)
+- **Caption kata-per-kata BESAR**: ALL-CAPS, putih tebal outline hitam,
+  1 kata per event, posisi tepat di bawah facecam (tengah-atas panel
+  gameplay). File `.ass` dengan PlayRes 1080x1920, font DejaVu Sans 110,
+  Bold, BorderStyle 1, Outline 3, Alignment 8, MarginV 890, durasi kata
+  minimal 0,12 detik.
+- **Durasi target 25–35 detik; hook = kata-kata pertama yang diucapkan**
+  (bukan judul statis di atas).
+- **JANGAN** bakar caption besar via filter `subtitles` + `.srt`:
+  SRT dikonversi ke ASS dengan PlayRes default 384x288 sehingga FontSize
+  diskalakan ~6,7x dan huruf jadi raksasa (sudah terbukti gagal di render
+  pertama). Selalu pakai file `.ass` asli + filter `ass`.
+
+Resep FFmpeg (angka crop facecam contoh klip Kai Cenat; beda streamer
+beda angka — jadikan parameter `--facecam x:y:w:h`):
+
+```bash
+[0:v]split[a][b];
+[a]crop=736:720:272:0,scale=1080:1056[game];
+[b]crop=255:198:15:520,scale=1080:864[cam];
+[cam][game]vstack,drawbox=x=0:y=0:w=1080:h=864:color=0xFF6B00:t=8,ass='kai-words.ass'[v]
+```
+
+Perintah lengkap:
+
+```bash
+# 1. Transkrip kata-per-kata -> .ass (faster-whisper tiny, CPU, int8)
+~/workspace/whisper-venv/bin/python scripts/caption_whisper.py \
+    --input clip.mp4 --output clip.ass --model tiny --language en
+# 2. Potong vertikal format referensi
+python3 scripts/vertical_cut.py --input clip.mp4 --start 0 --duration 30 \
+    --style ref --facecam 15:520:255:198 --ass clip.ass --output clip_01.mp4
+```
+
+**Penting — sinkronisasi timestamp:** `.ass` harus ditranskrip dari
+file segmen yang SAMA yang dipakai `vertical_cut.py`, dan `--start`
+harus 0 (atau offset yang sama). Kalau `.ass` dibuat dari VOD utuh,
+timestamp katanya tidak cocok dengan hasil `-ss` dan caption tidak muncul.
+
+Catatan transkripsi: PyAV 19 menolak kwarg `metadata_errors` yang
+dipakai faster-whisper — `caption_whisper.py` sudah mem-patch `av.open`
+untuk membuang kwarg itu sebelum transcribe. Model tiny ter-download ke
+`~/.cache/huggingface`.
+
 ## Kenapa chat, bukan nonton VOD 6 jam?
 
 Saat ada momen gila di stream, **chat meledak beberapa detik SETELAH momen
@@ -33,14 +87,20 @@ dan kenapa kecepatan posting di launch week menentukan siapa yang menang.
 3. Deteksi momen        -> python3 scripts/twitch_chat_spikes.py --chat chat.json
                           (output: kandidat momen, clip_start = spike - 20 dtk)
 4. Review kandidat      -> pilih 3-10 momen terbaik (jangan semua spike)
-5. Potong vertikal      -> python3 scripts/vertical_cut.py --input vod.mp4 \
-                             --start <clip_start> --duration 30 --layout gameplay
-6. Caption              -> python3 scripts/caption_whisper.py --input clip.mp4 \
-                             --output clip.srt   (atau subtitle YouTube + translate)
-                          -> terjemah EN->ID: scripts/translate_subtitles.py
-                          -> bakar ke video (vertical_cut.py --srt clip_id.srt)
-7. Copy Shorts          -> python3 scripts/generate_summary.py --streamer Lacy
-8. Upload ke Shorts     -> YouTube Studio / YouTube Data API (manual dulu)
+5. Potong segmen mentah -> potong dulu segmen 16:9 (scripts/clip_video.py)
+                          atau pakai file klip Twitch langsung (clip.mp4)
+6. Caption kata-per-kata-> ~/workspace/whisper-venv/bin/python scripts/caption_whisper.py \
+                             --input clip.mp4 --output clip.ass
+                          (atau subtitle YouTube + translate EN->ID)
+7. Potong vertikal      -> python3 scripts/vertical_cut.py --input clip.mp4 \
+                             --start 0 --duration 30 --style ref \
+                             --facecam <x:y:w:h> --ass clip.ass
+                          (format referensi = default; layout lama
+                          gameplay/facecam-top/facecam-bottom tetap ada;
+                          .ass harus dari file segmen yang sama — lihat
+                          "Format referensi" di atas)
+8. Copy Shorts          -> python3 scripts/generate_summary.py --streamer Lacy
+9. Upload ke Shorts     -> YouTube Studio / YouTube Data API (manual dulu)
 ```
 
 ### Rute B — LIVE (saat stream masih jalan, paling cepat)
@@ -69,7 +129,8 @@ untuk bakar subtitle)**, dan **TwitchDownloaderCLI** untuk VOD + chat
 Twitch (lihat [references/twitch-guide.md](references/twitch-guide.md)).
 
 Opsional: `faster-whisper` untuk caption otomatis
-(`pip install faster-whisper`). Tanpa itu, pakai subtitle YouTube +
+(`pip install faster-whisper` — di VM ini sudah ada di
+`~/workspace/whisper-venv/`). Tanpa itu, pakai subtitle YouTube +
 `translate_subtitles.py`.
 
 ### Sebagai skill (Muse / Claude Code)
@@ -117,7 +178,9 @@ gta6-clipper/
 ├── scripts/
 │   ├── twitch_chat_spikes.py  # BARU: deteksi momen dari chat Twitch
 │   ├── vertical_cut.py        # BARU: potong 9:16 (gameplay / facecam)
-│   ├── caption_whisper.py     # BARU: transkrip faster-whisper -> .srt
+│   │                            # + style ref (format referensi default)
+│   ├── caption_whisper.py     # BARU: transkrip faster-whisper ->
+│   │                            # .ass kata-per-kata (format referensi)
 │   ├── translate_subtitles.py # EN -> Bahasa Indonesia (diadaptasi)
 │   ├── generate_summary.py    # copy Shorts EN+ID (diadaptasi)
 │   ├── download_video.py      # yt-dlp download (dari repo asal)
